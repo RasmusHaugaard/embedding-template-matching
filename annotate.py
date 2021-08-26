@@ -51,11 +51,13 @@ def _main():
     import argparse
     from pathlib import Path
 
+    import utils
+
     parser = argparse.ArgumentParser()
     parser.add_argument('--name', required=True)
     args = parser.parse_args()
 
-    rgba_template = cv2.imread(f'templates/{args.name}.png', cv2.IMREAD_UNCHANGED)
+    rgba_template = utils.load_rgba_template(args.name)
 
     for fp in Path('images').glob('*.png'):
         img = cv2.imread(str(fp))

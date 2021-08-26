@@ -3,31 +3,37 @@ import numpy as np
 import torch
 from transform3d import Transform
 
-import utils
+
+def emb_for_vis(emb):
+    if isinstance(emb, torch.Tensor):
+        emb = emb.detach().cpu().numpy().transpose((1, 2, 0))
+    assert isinstance(emb, np.ndarray)
+    emb = emb[..., :3]
+    ma = np.abs(emb).max()
+    emb = 0.5 + emb / (ma * 2)
+    return emb
 
 
 def show_template(model, rotate=False):
-    emb_template = model.get_template().detach().cpu().numpy()
-    mi, ma = emb_template.min(), emb_template.max()
-    emb_template = (emb_template - mi) / (ma - mi)
+    emb_template = model.get_template()
     for i in range(len(emb_template) if rotate else 1):
-        im = emb_template[i, :3].transpose((1, 2, 0)).copy()
-        # print(im.shape)
-        cv2.imshow('', im)
+        cv2.imshow('', emb_for_vis(emb_template[i]))
         cv2.waitKey()
 
 
 def overlay_activation_2d(img, act, stride):
     hi, wi = img.shape[:2]
-    act = act.max(dim=0)[0]  # (h, w)
-    h, w = act.shape
-    act = torch.softmax(act.view(-1), 0).view(*act.shape)
-    act = (act.cpu().numpy() * 255).round().astype(np.uint8)
-    act = np.stack((np.zeros_like(act), np.zeros_like(act), act), axis=-1)
+    assert len(act.shape) == 3
+    _, h, w = act.shape
+    probs = torch.softmax(act.view(-1), 0).view(*act.shape)
+    probs_2d = probs.sum(dim=0)  # (h, w)
+    probs_2d = torch.round(probs_2d * 255).cpu().numpy().astype(np.uint8)
+    overlay = np.zeros((h, w, 3), dtype=np.uint8)
+    overlay[..., 2] = probs_2d
     hh, ww = h * stride, w * stride
-    act = cv2.resize(act, (ww, hh), interpolation=cv2.INTER_LINEAR)
+    overlay = cv2.resize(overlay, (ww, hh), interpolation=cv2.INTER_LINEAR)
     h, w = min(hi, hh), min(wi, ww)
-    temp = img[:h, :w] // 2 + act[:h, :w] // 2
+    temp = img[:h, :w] // 2 + overlay[:h, :w] // 2
     return temp
 
 
@@ -52,28 +58,32 @@ def _main():
     import utils
 
     parser = argparse.ArgumentParser()
+    parser.add_argument('--name', required=True)
     parser.add_argument('--template', action='store_true')
     parser.add_argument('--infer', action='store_true')
     args = parser.parse_args()
 
+    rgba_template = utils.load_rgba_template(args.name)
+
     device = torch.device('cuda:0')
     model = Model.load_from_checkpoint(
         checkpoint_path=utils.latest_checkpoint(),
-        rgba_template=cv2.imread('templates/big_pulley.png', cv2.IMREAD_UNCHANGED), normalize=False,
+        rgba_template=rgba_template,
     )
 
     if args.template:
-        show_template(model)
+        show_template(model, rotate=True)
 
     if args.infer:
         model.to(device)
-        for i in range(5, 7):
+        for i in range(0, 7):
             img = cv2.imread(f'images/{i}.png')[:704]
             img_ = utils.normalize(img)[None].to(model.device)
-            act = model.forward(img_)[0]  # (angle_thresh, h, w)
+            act = model.forward(img_)[0][0]  # (angle_thresh, h, w)
             act_img = overlay_activation_2d(img, act, model.stride)
             cv2.imshow('act', act_img)
-
+            pose = utils.pose_from_act(act.cpu().numpy(), model.stride)
+            cv2.imshow('pose', overlay_template(img, rgba_template, *pose))
             if cv2.waitKey() == ord('q'):
                 break
 

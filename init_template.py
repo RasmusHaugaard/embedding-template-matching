@@ -65,4 +65,4 @@ mask_img[yy, xx] = 255
 cv2.imshow('mask', mask_img)
 
 img_crop = np.concatenate((img_crop, mask_img[..., None]), axis=-1)
-cv2.imwrite(f'templates/{args.name}.png', img_crop)
+cv2.imwrite(f'rgba_templates/{args.name}.png', img_crop)

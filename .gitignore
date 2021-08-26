@@ -2,6 +2,6 @@
 annotations
 images
 lightning_logs
-templates
+rgba_templates
 __pycache__
 sb.py

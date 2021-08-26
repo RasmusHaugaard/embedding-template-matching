@@ -16,6 +16,7 @@ class Dataset(torch.utils.data.Dataset):
         self.tfms = []
         if tfms:
             self.tfms += [
+                A.CoarseDropout(max_holes=50, max_height=20, max_width=20),
                 A.ColorJitter(hue=0.1),
                 A.ISONoise(),
                 A.GaussNoise(),
@@ -35,13 +36,28 @@ class Dataset(torch.utils.data.Dataset):
         x, y, theta = np.loadtxt(str(self.annotation_fps[i]))
         img = cv2.imread(str(self.img_fps[i]))
 
+        # random crop
         off_x, off_y = np.random.randint(0, 30, 2)
         img = img[off_y:, off_x:]
         h, w = img.shape[:2]
         img = img[:h // 32 * 32, :w // 32 * 32]
+        h, w = img.shape[:2]
         x, y = x - off_x, y - off_y
 
-        # TODO: better data augs (translation, rotation)
+        # TODO: random overlay
+        # TODO: continuous rotation augmentation
+        r = np.random.randint(0, 4)
+        theta += r * .5 * np.pi
+        if r == 1:
+            img = img.transpose(1, 0, 2)[:, ::-1]
+            x, y = h - y - 1, x
+        elif r == 2:
+            img = img[::-1, ::-1]
+            x, y = w - x - 1, h - y - 1
+        elif r == 3:
+            img = img.transpose(1, 0, 2)[::-1]
+            x, y = y, w - x - 1
+
         img = self.tfms(image=img)['image']
         while theta < 0:
             theta += np.pi * 2
@@ -51,14 +67,18 @@ class Dataset(torch.utils.data.Dataset):
 
 
 def _main():
-    dataset = Dataset('big_pulley', norm=True)
+    import vis
+    name = 'big_pulley'
+    rgba_template = utils.load_rgba_template(name)
+    dataset = Dataset(name, norm=True)
     img = dataset[0][0]  # (C, H, W)
     print(img.mean(dim=(1, 2)), img.std(dim=(1, 2)))
 
-    dataset = Dataset('big_pulley', norm=False)
+    dataset = Dataset(name, norm=False)
     while True:
-        img = dataset[0][0]
-        cv2.imshow('', img)
+        img, *pose = dataset[np.random.randint(len(dataset))]
+        img_overlay = vis.overlay_template(img, rgba_template, *pose)
+        cv2.imshow('', img_overlay)
         key = cv2.waitKey()
         if key == ord('q'):
             return
