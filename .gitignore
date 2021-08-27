@@ -1,7 +1,5 @@
 .idea
-annotations
-images
-lightning_logs
-rgba_templates
+*.egg-info
 __pycache__
+sandbox
 sb.py

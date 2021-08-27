@@ -1,5 +1,4 @@
 import numpy as np
-import cv2
 import torch.utils.data
 import pytorch_lightning as pl
 

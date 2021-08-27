@@ -1,13 +1,15 @@
 import cv2
-import numpy as np
 import torch
+import rospy
 
-import utils
-from model import Model
-import vis
-from camera import Camera
+from . import utils
+from . import vis
+from .camera import Camera
+from .model import Model
 
 name = 'big_pulley'
+
+rospy.init_node('infer', anonymous=True)
 
 rgba_template = utils.load_rgba_template(name)
 model = Model.load_from_checkpoint(

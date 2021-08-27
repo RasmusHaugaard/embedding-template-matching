@@ -1,0 +1,10 @@
+rospkg
+numpy
+torch
+torchvision
+pytorch-lightning
+albumentations
+opencv-contrib-python
+transform3d
+trimesh
+pyrender

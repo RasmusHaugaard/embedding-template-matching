@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import pytorch_lightning as pl
 from scipy.spatial.transform import Rotation
 
-import unet
+from . import unet
 
 
 class Model(pl.LightningModule):
