@@ -3,6 +3,8 @@ import numpy as np
 import cv2
 import enum
 
+# TODO: init_object_without_cad and init_object_with_cad
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--name', required=True)
 parser.add_argument('--image', required=True)
@@ -52,14 +54,14 @@ cv2.waitKey()
 
 mask_args = np.argwhere(mask == 1)  # (N, 2)
 
-x, y = center
-k = int(np.ceil(np.linalg.norm((y, x) - mask_args, axis=-1).max()))
+mx, my = center
+k = int(np.ceil(np.linalg.norm((my, mx) - mask_args, axis=-1).max()))
 
-img_crop = img[y - k:y + k + 1, x - k:x + k + 1]
+img_crop = img[my - k:my + k + 1, mx - k:mx + k + 1]
 cv2.imshow('', img_crop)
 
 mask_img = np.zeros(img_crop.shape[:2], dtype=np.uint8)
-mask_args_centered = mask_args - (y, x) + k
+mask_args_centered = mask_args - (my, mx) + k
 yy, xx = mask_args_centered.T
 mask_img[yy, xx] = 255
 cv2.imshow('mask', mask_img)

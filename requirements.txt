@@ -8,3 +8,4 @@ opencv-contrib-python
 transform3d
 trimesh
 pyrender
+tqdm

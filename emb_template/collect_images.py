@@ -1,26 +1,22 @@
-from pathlib import Path
+import datetime
 
 import cv2
+import rospy
 
 from . import camera
-from . import utils
 
-cam_info = utils.load_cam_info()
+rospy.init_node('collect_images', anonymous=True)
 
-img_fps = list(Path('images').glob('*.png'))
-if not img_fps:
-    i = 0
-else:
-    i = max([int(fp.name.split('.')[0]) for fp in img_fps])
-
-cam = Camera()
+cam = camera.Camera()
+i = 0
 while True:
     img = cam.take_image()
     cv2.imshow('', img)
+    now = datetime.datetime.now()
     key = cv2.waitKey(1)
     if key == ord(' '):
-        cv2.imwrite(f'images/{i}.png', img)
+        cv2.imwrite(f'images/{datetime.datetime.now()}.png', img)
         i += 1
-        print(i)
+        print(f'{i} new images taken')
     elif key == ord('q'):
         break

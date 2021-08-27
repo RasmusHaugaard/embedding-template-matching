@@ -49,6 +49,10 @@ class Model(pl.LightningModule):
         return t
 
     def forward(self, img):
+        h, w = img.shape[-2:]
+        # unet can only handle resolutions in multiples of 32
+        h, w = h // 32 * 32, w // 32 * 32
+        img = img[..., :h, :w]
         emb = self.emb_forward(img)  # (B, C, H, W)
         if self.pad is not None:
             emb = F.pad(emb, [self.k] * 4, mode=self.pad)

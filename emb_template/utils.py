@@ -13,12 +13,6 @@ _normalize = A.Compose([
 ])
 
 
-def premultiply_alpha(img):
-    mask, img = img[..., 3:], img[..., :3]
-    img = (img * mask.astype(np.uint16)) // 255
-    return img.astype(np.uint8)
-
-
 def normalize(img):
     return _normalize(image=img)['image']
 

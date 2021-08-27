@@ -1,3 +1,5 @@
+import time
+
 import cv2
 import torch
 import rospy
@@ -19,7 +21,7 @@ model.eval()
 model.cuda()
 
 cam = Camera()
-cv2.imshow('rgba_template', utils.premultiply_alpha(rgba_template))
+cv2.imshow('rgba_template', vis.premultiply_alpha(rgba_template))
 cv2.imshow('emb_template', vis.emb_for_vis(model.get_template()[0]))
 
 while True:

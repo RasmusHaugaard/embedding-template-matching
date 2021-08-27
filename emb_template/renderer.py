@@ -10,12 +10,6 @@ import pyrender
 opengl_t_opencv = Transform(rotvec=(np.pi, 0, 0))
 
 
-def get_renderer(res=512):
-    return pyrender.OffscreenRenderer(
-        viewport_width=res, viewport_height=res
-    )
-
-
 class MeshRenderer:
     def __init__(self, mesh: trimesh.Trimesh, h: int, w: int, K: np.ndarray = None, yfov=np.deg2rad(45)):
         self.h, self.w = h, w
@@ -35,14 +29,14 @@ class MeshRenderer:
 
     def render(self, cam_t_obj: Transform):
         self.scene.set_pose(self.obj_node, cam_t_obj.matrix)
-        img, _ = self.renderer.render(self.scene, flags=pyrender.RenderFlags.RGBA)
-        return img
+        img, depth = self.renderer.render(self.scene, flags=pyrender.RenderFlags.RGBA)
+        return img, depth
 
 
 def _main():
     import cv2
     mesh_renderer = MeshRenderer(trimesh.primitives.Sphere(), 512, 512)
-    img = mesh_renderer.render(cam_t_obj=Transform(p=(0, 0, 3)))
+    img, _ = mesh_renderer.render(cam_t_obj=Transform(p=(0, 0, 3)))
     cv2.imshow('', img)
     cv2.waitKey()
 

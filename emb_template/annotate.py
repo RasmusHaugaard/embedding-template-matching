@@ -4,6 +4,8 @@ import numpy as np
 import vis
 
 
+# TODO: extend to include CAD data
+
 class Annotator:
     def __init__(self, im, rgba_template, cx=None, cy=None, theta=None):
         self.im = im

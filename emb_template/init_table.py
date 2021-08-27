@@ -32,7 +32,7 @@ img = cam.take_image()
 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
 corners, ids, _ = cv2.aruco.detectMarkers(
-    image=gray, dictionary=dictionary, cameraMatrix=cam_info.K, distCoeff=cam_info.D
+    image=gray, dictionary=dictionary, cameraMatrix=cam_info.K, distCoeff=None
 )
 if not corners:
     print('did not find charuco markers')
@@ -48,7 +48,7 @@ assert ret
 rvec, tvec = np.zeros(3), np.zeros(3)
 cv2.aruco.estimatePoseCharucoBoard(
     charucoCorners=np.array(charuco_corners), charucoIds=np.array(charuco_ids), board=board,
-    cameraMatrix=cam_info.K, distCoeffs=cam_info.D,
+    cameraMatrix=cam_info.K, distCoeffs=None,
     rvec=rvec, tvec=tvec
 )
 
@@ -56,7 +56,7 @@ if not args.no_debug:
     img_detections = img.copy()
     cv2.aruco.drawDetectedCornersCharuco(image=img_detections, charucoCorners=charuco_corners)
     cv2.drawFrameAxes(
-        image=img_detections, cameraMatrix=cam_info.K, distCoeffs=cam_info.D,
+        image=img_detections, cameraMatrix=cam_info.K, distCoeffs=None,
         rvec=rvec, tvec=tvec, length=args.squares_y * args.square_length,
     )
     cv2.imshow('', img_detections)

@@ -4,11 +4,12 @@
 
 ## workflow
 
-* configure scene
-* configure objects
-* collect initial dataset and train initial model
-* run model (data is stored)
-* improve model by annotating stored data
+* configure camera, table and objects
+* collect initial dataset
+* train initial models
+* improve models as necessary
+    * run model and save images of failure cases
+    * retrain model(s) and repeat
 
 ## thoughts and design decisions
 
@@ -21,25 +22,29 @@ relative to the object size, which may or may not be desired.
 **Full image coverage** is achieved by padding the embedding images, based on the template size. Padding with big
 templates and the following convolution requires more memory and computation.
 
-## TODO:
+## todo
 
-* get actual poses
-    * scene config
-        * object config
-            * template height from table
-            * rotation symmetry
-            * template_t_obj
-                * choose stable pose
-* refactor to module
-* training on multiple objects
+mvp:
+
+* get 3D poses
+    * object config
+    * template_t_obj
+* ros action server (obj_name -> cam_t_pose)
+    * dynamically load model
+    * store all images and predictions
+* script to delete (old) images with no annotations
+
+later:
+
+* multi-instance
+* same model for multiple objects
 * explicit template rotation symmetry
-* ros action server (obj_id -> pose)
-    * store all
 * refinement search
     * maybe global / local template
 * try smaller backbone
+* try bias towards template smoothness (reg. template 2nd derivative)
 * augmentations
     * continuous rotation
     * cut-n-paste
     * random overlays
-* write documentation
+* better documentation

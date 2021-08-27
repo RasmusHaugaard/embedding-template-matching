@@ -24,11 +24,9 @@ class Camera:
             if self.last_msg is not None:
                 msg = self.last_msg
                 self.last_msg = None
-                img = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, -1)[..., ::-1]
-                h, w = img.shape[:2]
-                # must be multiple of 32 (requirement of unet model)
-                h, w = h // 32 * 32, w // 32 * 32
-                img = img[:h, :w].copy()  # copy releases memory
+                img = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, -1)
+                img = img[..., ::-1]  # rgb -> bgr
+                img = img.copy()  # copy releases memory
                 break
             else:
                 time.sleep(0.002)
@@ -38,10 +36,10 @@ class Camera:
 
 
 class CameraInfo:
-    def __init__(self, image_topic: str, K: np.ndarray, D: np.ndarray):
+    def __init__(self, image_topic: str, K: np.ndarray, h: int, w: int):
         self.image_topic = image_topic
         self.K = K
-        self.D = D
+        self.h, self.w = h, w
 
     @classmethod
     def load(cls):
@@ -49,7 +47,7 @@ class CameraInfo:
         return cls(
             image_topic=d['image_topic'],
             K=np.array(d['K']),
-            D=np.array(d['D']),
+            h=d['h'], w=d['w'],
         )
 
 

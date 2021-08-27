@@ -20,6 +20,9 @@ rospy.init_node('init_cam_info', anonymous=True)
 msg = rospy.wait_for_message(f'{args.image_topic}/camera_info', sensor_msgs.msg.CameraInfo)
 D = np.array(msg.D)
 K = np.array(msg.K).reshape(3, 3)
+h, w = msg.height, msg.width
+
+assert np.all(D == 0) and np.all(K[(0, 1), (1, 0)] == 0), 'camera must be rectified'
 
 Path('images').mkdir(exist_ok=args.overwrite)
 Path('rgba_templates').mkdir(exist_ok=args.overwrite)
@@ -29,5 +32,5 @@ Path('models').mkdir(exist_ok=args.overwrite)
 json.dump(dict(
     image_topic=args.image_topic,
     K=K.tolist(),
-    D=D.tolist(),
+    h=h, w=w
 ), scene_fp.open('w'), indent=2)
