@@ -11,6 +11,31 @@
     * run model and save images of failure cases
     * retrain model(s) and repeat
 
+## scene folder structure
+
+All files can be initialized using the scripts in this project, or manually.
+
+* [scene folder]
+    * cam_info.json (image topic, camera calibration)
+    * cam_t_table.txt (table calibration)
+    * images
+        * [datetime].png
+    * objects
+        * [object name]
+            * cad.stl
+            * table_t_obj_stable.txt (stable pose)
+            * current_template.txt (name of current template)
+            * annotations
+                * [datetime].txt (cam_t_obj for the corresponding image)
+            * templates
+                * [template name]
+                    * obj_t_template.txt
+                    * rgba_template.png
+                    * sym.txt
+                    * current_model.txt (version of current model)
+                    * models
+                        * [model version].ckpt (parameters of trained model)
+
 ## thoughts and design decisions
 
 **Objects (and thus templates) of different sizes**
@@ -26,25 +51,34 @@ templates and the following convolution requires more memory and computation.
 
 mvp:
 
-* get 3D poses
-    * object config
-    * template_t_obj
+* continuous rotation aug
 * ros action server (obj_name -> cam_t_pose)
-    * dynamically load model
+    * dynamically load obj model
     * store all images and predictions
-* script to delete (old) images with no annotations
+* rename project
 
 later:
 
+* allow updating the camera
+    * new camera / camera calibration should not affect older annotations
+    * should be able to use old annotations, as long as scale has not changed
+* script to delete images with no annotations
+* monitor and log average recall
+* better documentation
+
+Maybe:
+
 * multi-instance
-* same model for multiple objects
+* use same model for multiple objects
 * explicit template rotation symmetry
 * refinement search
     * maybe global / local template
-* try smaller backbone
-* try bias towards template smoothness (reg. template 2nd derivative)
+* smaller backbone
+* bias towards template smoothness (reg. template 2nd derivative)
 * augmentations
-    * continuous rotation
+    
     * cut-n-paste
     * random overlays
-* better documentation
+    * small scale variation
+* sample validation set in a clever way
+* proper gui

@@ -43,6 +43,7 @@ class CameraInfo:
 
     @classmethod
     def load(cls):
+        # TODO: refactor to utils
         d = json.load(open('cam_info.json'))
         return cls(
             image_topic=d['image_topic'],

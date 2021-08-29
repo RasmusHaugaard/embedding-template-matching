@@ -7,7 +7,7 @@ import sensor_msgs.msg
 import numpy as np
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--image-topic', required=True)
+parser.add_argument('image_topic')
 parser.add_argument('--overwrite', '-y', action='store_true')
 args = parser.parse_args()
 
@@ -25,12 +25,11 @@ h, w = msg.height, msg.width
 assert np.all(D == 0) and np.all(K[(0, 1), (1, 0)] == 0), 'camera must be rectified'
 
 Path('images').mkdir(exist_ok=args.overwrite)
-Path('rgba_templates').mkdir(exist_ok=args.overwrite)
-Path('annotations').mkdir(exist_ok=args.overwrite)
-Path('models').mkdir(exist_ok=args.overwrite)
 
 json.dump(dict(
     image_topic=args.image_topic,
     K=K.tolist(),
     h=h, w=w
 ), scene_fp.open('w'), indent=2)
+
+print('camera intiialized')

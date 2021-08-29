@@ -1,23 +1,24 @@
-from pathlib import Path
-
 import cv2
 import numpy as np
 import torch.utils.data
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
-
-import utils
+from transform3d import Transform
 
 
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self, name='big_pulley', data_slice=slice(None), tfms=True, norm=True):
-        self.annotation_fps = utils.sorted_paths(Path('annotations').glob(f'*.{name}.txt'))[data_slice]
-        self.img_fps = [f"images/{str(fp.name).split('.')[0]}.png" for fp in self.annotation_fps]
+    def __init__(self, image_fps, annotation_fps, obj_t_template: Transform,
+                 K: np.ndarray, tfms=True, norm=True):
+        assert len(image_fps) == len(annotation_fps)
+        self.image_fps, self.annotation_fps = image_fps, annotation_fps
+        self.obj_t_template = obj_t_template
+        self.K = K
+
         self.tfms = []
         if tfms:
             self.tfms += [
                 A.CoarseDropout(max_holes=50, max_height=20, max_width=20),
-                A.ColorJitter(hue=0.1),
+                A.ColorJitter(brightness=0.4, contrast=0.4, hue=0.1),
                 A.ISONoise(),
                 A.GaussNoise(),
                 A.GaussianBlur(),
@@ -33,8 +34,14 @@ class Dataset(torch.utils.data.Dataset):
         return len(self.annotation_fps)
 
     def __getitem__(self, i):
-        x, y, theta = np.loadtxt(str(self.annotation_fps[i]))
-        img = cv2.imread(str(self.img_fps[i]))
+        img = cv2.imread(str(self.image_fps[i]))
+        cam_t_obj = Transform.load(self.annotation_fps[i])
+        cam_t_template = cam_t_obj @ self.obj_t_template
+        line = self.K @ cam_t_template.p
+        x, y = line[:2] / line[2]
+        # theta is the rotation around the camera principal axis.
+        img_xaxis_template = cam_t_template.R[:2, 0]
+        theta = np.arctan2(*img_xaxis_template[::-1])
 
         # random crop
         off_x, off_y = np.random.randint(0, 30, 2)
@@ -44,8 +51,12 @@ class Dataset(torch.utils.data.Dataset):
         h, w = img.shape[:2]
         x, y = x - off_x, y - off_y
 
-        # TODO: random overlay
-        # TODO: continuous rotation augmentation
+        # continuous rotation augmentation
+        theta_off = np.random.uniform(-45, 45)
+        M = cv2.getRotationMatrix2D((x, y), theta_off, 1)
+        img = cv2.warpAffine(src=img, M=M, dsize=(w, h), borderMode=cv2.BORDER_REFLECT)
+        theta -= theta_off * np.pi / 180
+
         r = np.random.randint(0, 4)
         theta += r * .5 * np.pi
         if r == 1:
@@ -64,25 +75,3 @@ class Dataset(torch.utils.data.Dataset):
         while theta > np.pi * 2:
             theta -= np.pi * 2
         return img, x, y, theta
-
-
-def _main():
-    import vis
-    name = 'big_pulley'
-    rgba_template = utils.load_rgba_template(name)
-    dataset = Dataset(name, norm=True)
-    img = dataset[0][0]  # (C, H, W)
-    print(img.mean(dim=(1, 2)), img.std(dim=(1, 2)))
-
-    dataset = Dataset(name, norm=False)
-    while True:
-        img, *pose = dataset[np.random.randint(len(dataset))]
-        img_overlay = vis.overlay_template(img, rgba_template, *pose)
-        cv2.imshow('', img_overlay)
-        key = cv2.waitKey()
-        if key == ord('q'):
-            return
-
-
-if __name__ == '__main__':
-    _main()

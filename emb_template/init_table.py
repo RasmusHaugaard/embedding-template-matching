@@ -52,6 +52,11 @@ cv2.aruco.estimatePoseCharucoBoard(
     rvec=rvec, tvec=tvec
 )
 
+cam_t_board = Transform(p=tvec, rotvec=rvec)
+angle = np.arccos(cam_t_board.R[:, 2] @ (0, 0, -1))
+print('This works best when the table is parallel to the image plane.')
+print(f'Table is {np.rad2deg(angle):.1f} degrees off with respect to the image plane')
+
 if not args.no_debug:
     img_detections = img.copy()
     cv2.aruco.drawDetectedCornersCharuco(image=img_detections, charucoCorners=charuco_corners)
@@ -60,11 +65,19 @@ if not args.no_debug:
         rvec=rvec, tvec=tvec, length=args.squares_y * args.square_length,
     )
     cv2.imshow('', img_detections)
+    print('Press q to abort')
     if cv2.waitKey() == ord('q'):
         quit()
 
 cam_t_board = Transform(p=tvec, rotvec=rvec)
 cam_t_table = cam_t_board @ Transform(p=(0, 0, -args.board_height))
+z = cam_t_table.R[:, 2]
+y = np.cross(z, (1, 0, 0))
+y = y / np.linalg.norm(y)
+x = np.cross(y, z)
+R = np.stack((x, y, z), axis=1)
+cam_t_table = Transform(R=R, p=cam_t_table.p)
 cam_t_table.save('cam_t_table.txt')
 
+print('Table is initialized')
 # TODO: warning if table is far from parallel to image plane

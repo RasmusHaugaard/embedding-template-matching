@@ -8,10 +8,18 @@ from . import unet
 
 
 class Model(pl.LightningModule):
-    def __init__(self, rgba_template: np.ndarray, emb_dim=3, normalize=False, angle_res=45):
+    def __init__(self, rgba_template: np.ndarray, sym: int,
+                 emb_dim=3, normalize=False,
+                 angle_resolution=90, position_resolution=40):
         super().__init__()
         self.s = rgba_template.shape[0]
-        self.angle_res = angle_res
+        self.sym = sym
+        if sym == -1:
+            self.local_angle_res = 1
+            self.local_angle_span = 1
+        else:
+            self.local_angle_res = int(np.ceil(angle_resolution / sym))
+            self.local_angle_span = 2 * np.pi / sym
         self.k = self.s // 2
         self.normalize = normalize
         self.emb_dim = emb_dim
@@ -21,11 +29,14 @@ class Model(pl.LightningModule):
         else:
             self.template = torch.nn.Parameter(torch.zeros(1, emb_dim, self.s, self.s))
         self.register_buffer('mask', torch.from_numpy(rgba_template[..., 3] == 255).float())
-        self.stride = max(1, self.s // 20)
+        self.stride = max(1, self.s // position_resolution)
 
-        rotvecs = np.linspace(0, -2 * np.pi, angle_res, endpoint=False)
-        rotvecs = np.stack((np.zeros(angle_res), np.zeros(angle_res), rotvecs), axis=-1)  # (N, 3)
-        M = np.zeros((angle_res, 3, 3))
+        rotvecs = np.stack((
+            np.zeros(self.local_angle_res),
+            np.zeros(self.local_angle_res),
+            np.linspace(0, -2 * np.pi / sym, self.local_angle_res, endpoint=False)
+        ), axis=-1)  # (N, 3)
+        M = np.zeros((self.local_angle_res, 3, 3))
         M[:, 2, 2] = 1
         M[:, :2, :2] = Rotation.from_rotvec(rotvecs).as_matrix()[:, :2, :2]
         M = torch.from_numpy(M[:, :2].astype(np.float32))
@@ -43,8 +54,8 @@ class Model(pl.LightningModule):
         t = t * self.mask[None, None]
         if self.normalize and False:
             t = F.normalize(t, dim=1)
-        t = torch.broadcast_to(t, (self.angle_res, self.emb_dim, self.s, self.s))
-        grid = F.affine_grid(self.M, [self.angle_res, self.emb_dim, self.s, self.s], align_corners=False)
+        t = torch.broadcast_to(t, (self.local_angle_res, self.emb_dim, self.s, self.s))
+        grid = F.affine_grid(self.M, [self.local_angle_res, self.emb_dim, self.s, self.s], align_corners=False)
         t = F.grid_sample(t, grid, align_corners=False)  # (angle_res, emb_dim, s, s)
         return t
 
@@ -67,12 +78,10 @@ class Model(pl.LightningModule):
         offset = self.k if self.pad is None else 0
         x = torch.round((x - offset) / self.stride).long()
         y = torch.round((y - offset) / self.stride).long()
-        theta_idx = torch.round(theta / (np.pi * 2 / self.angle_res)).long()
-        act_flat = act.view(b, self.angle_res * h * w)
+        theta_idx = torch.round(theta / self.local_angle_span * self.local_angle_res).long() % self.local_angle_res
+        act_flat = act.view(b, self.local_angle_res * h * w)
         target = theta_idx * h * w + y * w + x
-        ignore_mask = torch.logical_or(target < 0, self.angle_res * h * w <= target)
-        target[ignore_mask] = -1
-        loss = F.cross_entropy(act_flat, target, ignore_index=-1)
+        loss = F.cross_entropy(act_flat, target)
         self.log(f'{name}_loss', loss, prog_bar=prog_bar)
         return loss
 
@@ -83,4 +92,17 @@ class Model(pl.LightningModule):
         return self.step(batch, 'val', prog_bar=True)
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=1e-4)
+        opt = torch.optim.Adam(self.parameters(), lr=1e-4)
+
+        def lr(i):
+            # warmup
+            lr_ = min(i / 20, 1.)
+            return lr_
+
+        return dict(
+            optimizer=opt,
+            lr_scheduler=dict(
+                scheduler=torch.optim.lr_scheduler.LambdaLR(opt, lr),
+                interval='step',
+            ),
+        )

@@ -17,6 +17,6 @@ while True:
     if key == ord(' '):
         cv2.imwrite(f'images/{datetime.datetime.now()}.png', img)
         i += 1
-        print(f'{i} new images taken')
+        print(f'{i} new image(s) taken')
     elif key == ord('q'):
         break

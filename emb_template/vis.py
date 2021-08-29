@@ -22,15 +22,16 @@ def emb_for_vis(emb):
     assert isinstance(emb, np.ndarray)
     emb = emb[..., :3]
     ma = np.abs(emb).max()
-    emb = 0.5 + emb / (ma * 2)
-    return emb
+    emb = (0.5 + emb / (ma * 2)) * 255
+    return emb.astype(np.uint8)
 
 
 def show_template(model, rotate=False):
     emb_template = model.get_template()
     for i in range(len(emb_template) if rotate else 1):
         cv2.imshow('', emb_for_vis(emb_template[i]))
-        cv2.waitKey()
+        if cv2.waitKey() == 'q':
+            break
 
 
 def overlay_activation_2d(img, act, stride):
@@ -94,7 +95,7 @@ def _main():
             act = model.forward(img_)[0][0]  # (angle_thresh, h, w)
             act_img = overlay_activation_2d(img, act, model.stride)
             cv2.imshow('act', act_img)
-            pose = utils.pose_from_act(act.cpu().numpy(), model.stride)
+            pose = utils.pose_2d_from_act(act.cpu().numpy(), model.stride)
             cv2.imshow('pose', overlay_template(img, rgba_template, *pose))
             if cv2.waitKey() == ord('q'):
                 break

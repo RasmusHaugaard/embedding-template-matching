@@ -1,80 +1,118 @@
+import time
+import argparse
+from pathlib import Path
+
 import cv2
 import numpy as np
+import trimesh
+from transform3d import Transform
+import rospy
+import tqdm
 
-import vis
+from . import vis
+from . import utils
+from . import camera
+from .renderer import MeshRenderer
+
+parser = argparse.ArgumentParser()
+parser.add_argument('object_name')
+parser.add_argument('--oldest-first', action='store_true')
+parser.add_argument('--translation-scaling', type=float, default=0.3)
+parser.add_argument('--rotation-scaling', type=float, default=0.008)
+args = parser.parse_args()
+
+obj_folder = Path('objects') / args.object_name
+mesh = trimesh.load_mesh(obj_folder / 'cad.stl')
+cam_info = camera.CameraInfo.load()
+K = cam_info.K
+annotation_folder = obj_folder / 'annotations'
+annotation_folder.mkdir(exist_ok=True)
+
+annotations_required = set(utils.load_image_names()) - set(utils.load_annotation_names(args.object_name))
+annotations_required = sorted(annotations_required, reverse=not args.oldest_first)
+if not annotations_required:
+    print(f'No images need "{args.object_name}" annotations')
+    quit()
+
+renderer = MeshRenderer(mesh=mesh, h=cam_info.h, w=cam_info.w, K=cam_info.K)
+rospy.init_node('annotate', anonymous=True)
+cam = camera.Camera(cam_info.image_topic)
+cam_t_table = Transform.load('cam_t_table.txt')
+table_normal = cam_t_table.R[:, 2]
+table_point = cam_t_table.p
+table_t_obj_stable = Transform.load(obj_folder / 'table_t_obj_stable.txt')
+
+cam_t_table_center = utils.get_cam_t_table_center(cam_t_table=cam_t_table, K=K, w=cam_info.w, h=cam_info.h)
+# TODO: center based on CAD model bounding xy circle (cv2.minEnclosingCircle)
+cam_t_obj_init = cam_t_table_center @ table_t_obj_stable
+# TODO: define the pose in table xy plane during pose annotation to avoid drifting
+
+print()
+print('Annotate pose by moving the mouse while holding ctrl (pos) and shift (rotation).\n'
+      'Press \n'
+      '  - Enter or Space to confirm pose \n'
+      '  - Delete or Backspace if the object is not in the image\n'
+      '  - r to reset pose\n'
+      '  - q to quit')
+
+for image_name in tqdm.tqdm(annotations_required):
+    annotation_path = obj_folder / 'annotations' / f'{image_name}.txt'
+    img = cv2.imread(f'images/{image_name}.png')
+    cam_t_obj = cam_t_obj_init
+    mx, my = None, None  # mouse position
+    hidden = False
 
 
-# TODO: extend to include CAD data
+    def draw():
+        global hidden
+        render, _ = renderer.render(cam_t_obj)
+        cv2.imshow('', vis.composite(img, render[..., :3], render[..., 3:] // 2))
+        hidden = False
 
-class Annotator:
-    def __init__(self, im, rgba_template, cx=None, cy=None, theta=None):
-        self.im = im
-        self.h, self.w = im.shape[:2]
-        self.rgba_template = rgba_template
-        self.k = rgba_template.shape[0] // 2
 
-        self.theta = 0 if theta is None else theta
-        self.cx = self.w // 2 if cx is None else cx
-        self.cy = self.h // 2 if cy is None else cy
-
-        self.x, self.y = None, None
-
-    def draw(self):
-        temp = vis.overlay_template(self.im, self.rgba_template, self.cx, self.cy, self.theta)
-        cv2.imshow('', temp)
-
-    def mouse_cb(self, event, xx, yy, flags, _):
+    def mouse_cb(event, x, y, flags, _):
+        global mx, my, cam_t_obj
         if flags & cv2.EVENT_FLAG_CTRLKEY:
-            if self.x is not None and self.y is not None:
-                dx, dy = xx - self.x, yy - self.y
-                self.cx += dx / 2
-                self.cy += dy / 2
-            self.x, self.y = xx, yy
+            if mx is not None and my is not None:
+                dp_img = np.array((x - mx, y - my))
+                jac_img_xy = K[:2, :2] / cam_t_obj.p[2]
+                jac_img_table = jac_img_xy @ cam_t_table.R[:2, :2]
+                # jac_img_table @ dp_table = dp_img, solve for dp_table:
+                dp_table = np.linalg.solve(jac_img_table, dp_img)
+                dp_cam = cam_t_table.R @ (*dp_table, 0)
+                cam_t_obj = Transform(p=args.translation_scaling * dp_cam) @ cam_t_obj
+                draw()
+            mx, my = x, y
         elif flags & cv2.EVENT_FLAG_SHIFTKEY:
-            if self.x is not None and self.y is None:
-                self.theta += (xx - self.x) * np.pi / 360
-            self.x, self.y = xx, None
+            if mx is not None and my is None:
+                # TODO: rotate as if the mouse is dragging the object around the rotation axis
+                phi = (x - mx) * args.rotation_scaling
+                cam_t_obj = cam_t_obj @ table_t_obj_stable.inv @ Transform(rotvec=(0, 0, phi)) @ table_t_obj_stable
+                draw()
+            mx, my = x, None
         else:
-            self.x, self.y = None, None
-        self.draw()
-
-    def run(self):
-        self.draw()
-        cv2.setMouseCallback('', self.mouse_cb)
-        while True:
-            key = cv2.waitKey()
-            if key == ord('q'):
-                return None
-            elif key == ord(' '):
-                return self.cx, self.cy, self.theta
+            mx, my = None, None
 
 
-def _main():
-    import argparse
-    from pathlib import Path
-
-    import utils
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--name', required=True)
-    args = parser.parse_args()
-
-    rgba_template = utils.load_rgba_template(args.name)
-
-    for fp in Path('images').glob('*.png'):
-        img = cv2.imread(str(fp))
-        i = int(fp.name.split('.')[0])
-        fp_anno = Path(f'annotations/{i}.{args.name}.txt')
-        if fp_anno.exists():
-            cx, cy, theta = np.loadtxt(str(fp_anno))
-        else:
-            cx, cy, theta = None, None, None
-        anno = Annotator(im=img, rgba_template=rgba_template, cx=cx, cy=cy, theta=theta).run()
-        if anno is None:
+    draw()
+    cv2.setMouseCallback('', mouse_cb)
+    while True:
+        key = cv2.waitKey()
+        if key == ord('q'):
+            quit()
+        elif key == ord(' ') or key == ord('\r'):
+            cam_t_obj.save(annotation_path)
             break
-        cx, cy, theta = anno
-        np.savetxt(str(fp_anno), (cx, cy, theta))
-
-
-if __name__ == '__main__':
-    _main()
+        elif key == ord('s'):
+            break
+        elif key == 8 or key == 255:  # Backspace, Delete
+            annotation_path.open('w').close()
+            break
+        elif key == ord('r'):
+            cam_t_obj = cam_t_obj_init
+        elif key == ord('h'):
+            hidden = not hidden
+            if hidden:
+                cv2.imshow('', img)
+            else:
+                draw()
