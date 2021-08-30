@@ -49,20 +49,14 @@ templates and the following convolution requires more memory and computation.
 
 ## todo
 
-mvp:
-
-* continuous rotation aug
-* ros action server (obj_name -> cam_t_pose)
-    * dynamically load obj model
-    * store all images and predictions
-* rename project
-
-later:
-
+* per object logs (also from infer) ?
+    * use these in annotate
+* allow to select a roi
+    * project wide? / per object?
 * allow updating the camera
     * new camera / camera calibration should not affect older annotations
     * should be able to use old annotations, as long as scale has not changed
-* script to delete images with no annotations
+* script to delete images / log images with no annotations
 * monitor and log average recall
 * better documentation
 
@@ -76,7 +70,6 @@ Maybe:
 * smaller backbone
 * bias towards template smoothness (reg. template 2nd derivative)
 * augmentations
-    
     * cut-n-paste
     * random overlays
     * small scale variation

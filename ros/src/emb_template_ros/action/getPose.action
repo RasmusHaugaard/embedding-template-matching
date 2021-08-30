@@ -1,0 +1,7 @@
+# Goal
+string object_name
+---
+# Result
+geometry_msgs/Pose pose
+---
+# Feedback

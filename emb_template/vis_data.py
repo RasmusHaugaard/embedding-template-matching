@@ -12,7 +12,7 @@ parser.add_argument('object_name')
 args = parser.parse_args()
 object_name = args.object_name
 
-rgba_template, obj_t_template, sym = utils.load_current_template(object_name)
+rgba_template, _, obj_t_template, sym = utils.load_current_template(object_name)
 annotation_fps, image_fps = utils.load_valid_annotation_and_image_fps(object_name)
 cam_info = CameraInfo.load()
 dataset = Dataset(annotation_fps=annotation_fps, image_fps=image_fps,

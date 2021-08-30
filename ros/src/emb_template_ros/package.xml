@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>emb_template_ros</name>
+  <version>0.0.0</version>
+  <description>Table top pose estimation by template matching in embedding space</description>
+  <maintainer email="rasmus.l.haugaard@gmail.com">Rasmus Laurvig Haugaard</maintainer>
+  <license>TODO</license>
+  <build_depend>message_generation</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+  <exec_depend>message_runtime</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <buildtool_depend>catkin</buildtool_depend>
+</package>
