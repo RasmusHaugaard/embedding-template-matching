@@ -1,3 +1,4 @@
+import cv2
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -5,15 +6,19 @@ import pytorch_lightning as pl
 from scipy.spatial.transform import Rotation
 
 from . import unet
+from . import utils
 
 
 class Model(pl.LightningModule):
     def __init__(self, rgba_template: np.ndarray, sym: int,
                  emb_dim=3, beta: float = 0.,
-                 angle_resolution=90, position_resolution=30):
+                 angle_resolution=90, position_resolution=30,
+                 img_scale=1.):
         super().__init__()
-        self.save_hyperparameters('emb_dim', 'angle_resolution', 'position_resolution')
+        self.save_hyperparameters('emb_dim', 'angle_resolution', 'position_resolution', 'img_scale')
         self.emb_dim = emb_dim
+        self.img_scale = img_scale
+        rgba_template = utils.resize(rgba_template, img_scale, interp=cv2.INTER_NEAREST)[0]
         self.s = rgba_template.shape[0]
         self.sym = sym
         self.beta = beta

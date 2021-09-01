@@ -131,6 +131,14 @@ def load_valid_annotation_and_image_fps(object_name):
     return annotation_fps, image_fps
 
 
+def resize(img: np.ndarray, img_scale: float, interp=cv2.INTER_LINEAR):
+    h, w = (int(np.floor(r * img_scale)) for r in img.shape[:2])
+    M = np.eye(3) * img_scale
+    M[2, 2] = 1.
+    img = cv2.warpAffine(img, M[:2], (w, h), flags=interp)
+    return img, M
+
+
 def load_template(object_name, template_name):
     template_folder = get_template_folder(object_name, template_name)
     rgba_template = cv2.imread(str(template_folder / 'rgba_template.png'), cv2.IMREAD_UNCHANGED)

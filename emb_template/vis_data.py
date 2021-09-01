@@ -1,6 +1,7 @@
 import argparse
 
 import cv2
+from tqdm import tqdm
 
 from . import vis
 from . import utils
@@ -9,6 +10,7 @@ from .camera import CameraInfo
 
 parser = argparse.ArgumentParser()
 parser.add_argument('object_name')
+parser.add_argument('--img-scale', type=float, default=1.)
 args = parser.parse_args()
 object_name = args.object_name
 
@@ -16,9 +18,11 @@ rgba_template, _, obj_t_template, sym = utils.load_current_template(object_name)
 annotation_fps, image_fps = utils.load_valid_annotation_and_image_fps(object_name)
 cam_info = CameraInfo.load()
 
+rgba_template = utils.resize(rgba_template, args.img_scale)[0]
+
 
 def get_dataset():
-    return Dataset(annotation_fps=annotation_fps, image_fps=image_fps,
+    return Dataset(annotation_fps=annotation_fps, image_fps=image_fps, img_scale=args.img_scale,
                    obj_t_template=obj_t_template, K=cam_info.K, norm=False)
 
 
@@ -45,8 +49,11 @@ def draw(update_image=True):
         cv2.imshow('', img_temp)
 
 
+pbar = tqdm(total=len(dataset))
 draw()
 while True:
+    pbar.n = i + 1
+    pbar.refresh()
     key = cv2.waitKey()
     if key == ord('q'):
         break
@@ -70,4 +77,4 @@ while True:
         dataset = get_dataset()
         i = i % len(dataset)
         draw()
-    print(f'{i + 1} / {len(dataset)}')
+        pbar.reset(total=len(dataset))

@@ -1,9 +1,6 @@
-import datetime
 import argparse
-from pathlib import Path
 import threading
 
-import cv2
 import numpy as np
 import torch
 from transform3d import Transform
@@ -49,14 +46,16 @@ def execute_cb(goal):
         )
         model.eval()
         model.to(device)
-        img = cam.take_image()
+        img_full = cam.take_image()
+        img, M = utils.resize(img_full, model.img_scale)
+        K = M @ cam_info.K
         act, _ = model.forward(utils.normalize(img)[None].to(device))
         stride = model.stride
         del model
         act = act[0].cpu().numpy()
 
         pose_2d = utils.pose_2d_from_act(act=act, stride=stride, sym=sym)
-        cam_t_obj = utils.get_pose_3d(pose_2d=pose_2d, K=cam_info.K, cam_t_table=cam_t_table,
+        cam_t_obj = utils.get_pose_3d(pose_2d=pose_2d, K=K, cam_t_table=cam_t_table,
                                       table_offset=table_offset, obj_t_template=obj_t_template)
 
     result = emb_template_ros.msg.getPoseResult()
@@ -72,12 +71,12 @@ def execute_cb(goal):
             mesh=utils.load_mesh(object_name), h=cam_info.h, w=cam_info.w, K=cam_info.K,
         ).render(cam_t_obj)[0].copy()
     render[..., :2] = 0
-    img_overlay = vis.composite(img, render[..., :3], render[..., 3:] // 2)  # type: np.ndarray
+    img_overlay = vis.composite(img_full, render[..., :3], render[..., 3:] // 2)  # type: np.ndarray
 
     img_msg = ros_numpy.image.numpy_to_image(img_overlay, 'bgr8')
     pub_image_annotated.publish(img_msg)
 
-    utils.log_prediction(object_name=object_name, img=img, cam_t_obj=cam_t_obj)
+    utils.log_prediction(object_name=object_name, img=img_full, cam_t_obj=cam_t_obj)
 
 
 server = actionlib.SimpleActionServer(

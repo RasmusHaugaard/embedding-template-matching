@@ -5,14 +5,17 @@ import albumentations as A
 from albumentations.pytorch import ToTensorV2
 from transform3d import Transform
 
+from . import utils
+
 
 class Dataset(torch.utils.data.Dataset):
     def __init__(self, image_fps, annotation_fps, obj_t_template: Transform,
-                 K: np.ndarray, tfms=True, norm=True):
+                 K: np.ndarray, tfms=True, norm=True, img_scale=1.):
         assert len(image_fps) == len(annotation_fps)
         self.image_fps, self.annotation_fps = image_fps, annotation_fps
         self.obj_t_template = obj_t_template
         self.K = K
+        self.img_scale = img_scale
 
         self.tfms = []
         if tfms:
@@ -34,11 +37,13 @@ class Dataset(torch.utils.data.Dataset):
         return len(self.annotation_fps)
 
     def __getitem__(self, i):
-        img = cv2.imread(str(self.image_fps[i]))
+        img, M = utils.resize(cv2.imread(str(self.image_fps[i])), self.img_scale)
+        K = M @ self.K
         cam_t_obj = Transform.load(self.annotation_fps[i])
         cam_t_template = cam_t_obj @ self.obj_t_template
-        line = self.K @ cam_t_template.p
+        line = K @ cam_t_template.p
         x, y = line[:2] / line[2]
+        # TODO: have a look at this again
         # theta is the rotation around the camera principal axis.
         img_xaxis_template = cam_t_template.R[:2, 0]
         theta = np.arctan2(*img_xaxis_template[::-1])
@@ -57,6 +62,7 @@ class Dataset(torch.utils.data.Dataset):
         img = cv2.warpAffine(src=img, M=M, dsize=(w, h), borderMode=cv2.BORDER_REFLECT)
         theta -= theta_off * np.pi / 180
 
+        # discrete rotation augmentation
         r = np.random.randint(0, 4)
         theta += r * .5 * np.pi
         if r == 1:

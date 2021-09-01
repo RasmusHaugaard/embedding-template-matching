@@ -8,6 +8,7 @@ from transform3d import Transform
 from . import camera
 
 parser = argparse.ArgumentParser()
+parser.add_argument('--from-file')
 parser.add_argument('--dictionary', default='4X4_100')
 parser.add_argument('--marker-length', type=float, default=0.015)
 parser.add_argument('--square-length', type=float, default=0.020)
@@ -26,9 +27,12 @@ board = cv2.aruco.CharucoBoard_create(
 
 rospy.init_node('init_table', anonymous=True)
 cam_info = camera.CameraInfo.load()
-cam = camera.Camera(cam_info.image_topic)
 
-img = cam.take_image()
+if args.from_file is not None:
+    img = cv2.imread(args.from_file)
+else:
+    cam = camera.Camera(cam_info.image_topic)
+    img = cam.take_image()
 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
 corners, ids, _ = cv2.aruco.detectMarkers(
@@ -80,4 +84,3 @@ cam_t_table = Transform(R=R, p=cam_t_table.p)
 cam_t_table.save('cam_t_table.txt')
 
 print('Table is initialized')
-# TODO: warning if table is far from parallel to image plane

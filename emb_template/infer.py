@@ -14,6 +14,7 @@ from .renderer import MeshRenderer
 
 parser = argparse.ArgumentParser()
 parser.add_argument('object_name')
+parser.add_argument('--from-file')
 parser.add_argument('--show-template', action='store_true')
 parser.add_argument('--show-embedding', action='store_true')
 parser.add_argument('--show-activation', action='store_true')
@@ -25,11 +26,6 @@ object_name = args.object_name
 cam_t_table = Transform.load('cam_t_table.txt')
 rgba_template, table_offset, obj_t_template, sym = utils.load_current_template(object_name)
 cam_info = CameraInfo.load()
-renderer = MeshRenderer(
-    mesh=utils.load_mesh(object_name), h=cam_info.h, w=cam_info.w, K=cam_info.K,
-)
-
-rospy.init_node('infer', anonymous=True)
 
 model = Model.load_from_checkpoint(
     # TODO: load *current* model
@@ -38,8 +34,26 @@ model = Model.load_from_checkpoint(
 )
 model.eval()
 model.cuda()
+img_scale = model.img_scale
+rgba_template = utils.resize(rgba_template, img_scale)[0]
 
-cam = Camera()
+img_temp, M = utils.resize(np.zeros((cam_info.h, cam_info.w, 3)), img_scale)
+h, w = img_temp.shape[:2]
+K = M @ cam_info.K
+renderer = MeshRenderer(
+    mesh=utils.load_mesh(object_name), h=h, w=w, K=K,
+)
+
+if args.from_file is not None:
+    def get_img():
+        return cv2.imread(args.from_file)
+else:
+    rospy.init_node('infer', anonymous=True)
+    cam = Camera()
+
+
+    def get_img():
+        return cam.take_image()
 
 if args.show_template:
     template = model.get_template()[0]
@@ -57,7 +71,8 @@ do_render = True
 hidden = False
 
 while True:
-    img = cam.take_image()
+    img_full = get_img()
+    img = utils.resize(img_full, img_scale)[0]
     img_ = utils.normalize(img).to(model.device)
     with torch.no_grad():
         act, emb = model.forward(img_[None])
@@ -75,7 +90,7 @@ while True:
     act = act.cpu().numpy()
     pose_2d = utils.pose_2d_from_act(act=act, stride=model.stride, sym=sym)
     cam_t_obj = utils.get_pose_3d(
-        pose_2d=pose_2d, K=cam_info.K, cam_t_table=cam_t_table,
+        pose_2d=pose_2d, K=K, cam_t_table=cam_t_table,
         table_offset=table_offset, obj_t_template=obj_t_template,
     )
 
@@ -94,7 +109,7 @@ while True:
     if key == ord('q'):
         break
     elif key == ord('\r') or key == ord(' '):
-        utils.log_prediction(object_name=object_name, img=img, cam_t_obj=cam_t_obj)
+        utils.log_prediction(object_name=object_name, img=img_full, cam_t_obj=cam_t_obj)
         print('Image saved in logs')
     elif key == ord('r'):
         do_render = not do_render

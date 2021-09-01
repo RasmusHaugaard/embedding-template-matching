@@ -12,7 +12,7 @@ class Camera:
     def __init__(self, image_topic: str = None):
         if image_topic is None:
             image_topic = CameraInfo.load().image_topic
-        rospy.Subscriber(f'{image_topic}/image_raw', sensor_msgs.msg.Image, self._temp_store_img, queue_size=1)
+        rospy.Subscriber(image_topic, sensor_msgs.msg.Image, self._temp_store_img, queue_size=1)
         self.last_msg = None  # type: Union[None, sensor_msgs.msg.Image]
 
     def _temp_store_img(self, msg: sensor_msgs.msg.Image):
