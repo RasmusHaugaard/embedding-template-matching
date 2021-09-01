@@ -24,8 +24,6 @@ h, w = msg.height, msg.width
 
 assert np.all(D == 0) and np.all(K[(0, 1), (1, 0)] == 0), 'camera must be rectified'
 
-Path('images').mkdir(exist_ok=args.overwrite)
-
 json.dump(dict(
     image_topic=args.image_topic,
     K=K.tolist(),

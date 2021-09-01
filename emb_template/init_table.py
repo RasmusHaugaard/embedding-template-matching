@@ -13,7 +13,7 @@ parser.add_argument('--marker-length', type=float, default=0.015)
 parser.add_argument('--square-length', type=float, default=0.020)
 parser.add_argument('--squares-x', type=int, default=14)
 parser.add_argument('--squares-y', type=int, default=9)
-parser.add_argument('--board-height', type=float, default=0.006)
+parser.add_argument('--board-height', type=float, default=0.003)
 parser.add_argument('--no-debug', action='store_true')
 
 args = parser.parse_args()

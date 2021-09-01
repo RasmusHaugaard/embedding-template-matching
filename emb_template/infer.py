@@ -1,6 +1,4 @@
-import time
 import argparse
-import datetime
 
 import cv2
 import numpy as np
@@ -44,16 +42,19 @@ model.cuda()
 cam = Camera()
 
 if args.show_template:
-    template = np.concatenate((
+    template = model.get_template()[0]
+    template_img = np.concatenate((
         vis.premultiply_alpha(rgba_template),
-        vis.emb_for_vis(model.get_template()[0]),
+        vis.emb_for_vis(template),
     ), axis=1)
-    cv2.imshow('template', template)
+    cv2.imshow('template', template_img)
+    print(f'template mean norm: {template.norm(dim=1).mean():0.3e}')
 
 print('Press Space or Enter to save the current image for annotation.\n'
       '"r" to switch between 3D pose render and template overlay')
 
 do_render = True
+hidden = False
 
 while True:
     img = cam.take_image()
@@ -64,7 +65,10 @@ while True:
     if args.show_activation:
         cv2.imshow('act', vis.overlay_activation_2d(img, act, model.stride))
     if args.show_embedding:
-        cv2.imshow('emb', vis.emb_for_vis(emb))
+        emb_img = vis.emb_for_vis(emb).copy()
+        cv2.putText(emb_img, f'mean norm: {emb.norm(dim=1).mean():0.3e}', (0, 12),
+                    cv2.FONT_HERSHEY_PLAIN, 1., (255, 255, 255))
+        cv2.imshow('emb', emb_img)
     probs = torch.softmax(act.view(-1), 0).view(*act.shape)
     certainty = probs.max().item()
 
@@ -75,20 +79,24 @@ while True:
         table_offset=table_offset, obj_t_template=obj_t_template,
     )
 
-    if do_render:
-        render = renderer.render(cam_t_obj)[0].copy()
-        render[..., :2] = 0
-        img_overlay = vis.composite(img, render[..., :3], render[..., 3:] // 2)
+    if hidden:
+        img_overlay = img.copy()
     else:
-        img_overlay = vis.overlay_template(img, rgba_template, *pose_2d)
+        if do_render:
+            render = renderer.render(cam_t_obj)[0].copy()
+            render[..., :2] = 0
+            img_overlay = vis.composite(img, render[..., :3], render[..., 3:] // 2)
+        else:
+            img_overlay = vis.overlay_template(img, rgba_template, *pose_2d)
     cv2.putText(img_overlay, f'certainty: {certainty:.2f}', (0, 12), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 255))
     cv2.imshow('', img_overlay)
     key = cv2.waitKey(1)
     if key == ord('q'):
         break
     elif key == ord('\r') or key == ord(' '):
-        cv2.imwrite(str(utils.get_image_folder() / f'{datetime.datetime.now()}.png'), img)
-        print('Image saved.')
-        time.sleep(.3)
+        utils.log_prediction(object_name=object_name, img=img, cam_t_obj=cam_t_obj)
+        print('Image saved in logs')
     elif key == ord('r'):
         do_render = not do_render
+    elif key == ord('h'):
+        hidden = not hidden

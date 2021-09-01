@@ -29,8 +29,8 @@ if template_folder.exists():
     print('Template with that name already exists.')
     quit()
 
-annotation_names, annotations = utils.load_valid_annotations(object_name)
-if not annotations:
+annotation_fps, image_fps = utils.load_valid_annotation_and_image_fps(object_name)
+if not annotation_fps:
     print('Annotate some poses first.')
     quit()
 
@@ -45,8 +45,9 @@ print('Use "a" and "d" to select an image for template initialization.\n'
 
 i = 0
 while True:
-    img = utils.load_image(annotation_names[i])
-    cam_t_obj = annotations[i]
+    img = cv2.imread(str(image_fps[i]))
+    print(image_fps[i])
+    cam_t_obj = Transform.load(annotation_fps[i])
     overlay, depth = renderer.render(cam_t_obj)
     comp = vis.composite(img, overlay[..., :3], overlay[..., 3:])
     cv2.imshow('', comp)
@@ -54,9 +55,9 @@ while True:
     if key == ord('q'):
         quit()
     elif key == ord('a'):
-        i = (i - 1) % len(annotation_names)
+        i = (i - 1) % len(annotation_fps)
     elif key == ord('d'):
-        i = (i + 1) % len(annotation_names)
+        i = (i + 1) % len(annotation_fps)
     elif key == ord('\r'):
         break
 

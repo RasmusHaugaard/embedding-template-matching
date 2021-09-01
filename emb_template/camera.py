@@ -5,6 +5,7 @@ import json
 import numpy as np
 import rospy
 import sensor_msgs.msg
+import ros_numpy
 
 
 class Camera:
@@ -24,9 +25,7 @@ class Camera:
             if self.last_msg is not None:
                 msg = self.last_msg
                 self.last_msg = None
-                img = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, -1)
-                img = img[..., ::-1]  # rgb -> bgr
-                img = img.copy()  # copy releases memory
+                img = ros_numpy.image.image_to_numpy(msg)[..., ::-1]  # rgb -> bgr
                 break
             else:
                 time.sleep(0.002)

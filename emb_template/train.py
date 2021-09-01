@@ -17,6 +17,12 @@ parser.add_argument('--gpu', type=int, default=0)
 parser.add_argument('--dataset-min-size', type=int, default=10)
 parser.add_argument('--val-ratio', type=float, default=0.1)
 parser.add_argument('--val-min', type=int, default=5)
+parser.add_argument('--emb-dim', type=int, default=3)
+parser.add_argument('--position-res', type=int, default=30)
+parser.add_argument('--angle-res', type=int, default=90)
+parser.add_argument('--beta', type=float, default=0.)
+parser.add_argument('--min-epochs', type=int, default=5)
+parser.add_argument('--max-epochs', type=int, default=50)
 args = parser.parse_args()
 object_name = args.object_name
 dataset_min_size = args.dataset_min_size
@@ -46,7 +52,8 @@ loader_kwargs = dict(batch_size=1, num_workers=5, persistent_workers=True,
 train_loader = torch.utils.data.DataLoader(dataset=train_data, shuffle=True, **loader_kwargs)
 valid_loader = torch.utils.data.DataLoader(dataset=val_data, **loader_kwargs)
 
-model = Model(rgba_template=rgba_template, sym=sym)
+model = Model(rgba_template=rgba_template, sym=sym, beta=args.beta, emb_dim=args.emb_dim,
+              angle_resolution=args.angle_res, position_resolution=args.position_res)
 
 trainer = pl.Trainer(
     logger=TensorBoardLogger(utils.get_current_template_folder(object_name), 'models'),
@@ -55,6 +62,8 @@ trainer = pl.Trainer(
         pl.callbacks.EarlyStopping(monitor='val_loss', patience=args.patience),
         pl.callbacks.ModelCheckpoint(monitor='val_loss')
     ],
+    min_epochs=args.min_epochs,
+    max_epochs=args.max_epochs,
 )
 trainer.fit(model=model, train_dataloader=train_loader, val_dataloaders=valid_loader)
 

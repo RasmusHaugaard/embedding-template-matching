@@ -6,11 +6,12 @@ import threading
 import cv2
 import numpy as np
 import torch
+from transform3d import Transform
 import rospy
 import actionlib
 import sensor_msgs.msg
 import geometry_msgs.msg
-from transform3d import Transform
+import ros_numpy
 
 import emb_template_ros.msg
 from .camera import Camera, CameraInfo
@@ -20,7 +21,7 @@ from .renderer import MeshRenderer
 from .model import Model
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--name', default='emb_template')
+parser.add_argument('name')
 parser.add_argument('--device', default='cuda:0')
 args = parser.parse_args()
 name = args.name
@@ -32,9 +33,6 @@ pub_image_annotated = rospy.Publisher(f'{name}/pose_visualized', sensor_msgs.msg
 cam_info = CameraInfo.load()
 cam = Camera(cam_info.image_topic)
 cam_t_table = Transform.load('cam_t_table.txt')
-
-log_folder = Path('action_server_log')
-log_folder.mkdir(exist_ok=True)
 
 gpu_lock = threading.Lock()
 
@@ -75,16 +73,11 @@ def execute_cb(goal):
         ).render(cam_t_obj)[0].copy()
     render[..., :2] = 0
     img_overlay = vis.composite(img, render[..., :3], render[..., 3:] // 2)  # type: np.ndarray
-    img_msg = sensor_msgs.msg.Image(encoding='bgr8')
-    contig = np.ascontiguousarray(img_overlay)
-    img_msg.step = contig.strides[0]
-    img_msg.data = contig.tobytes()
-    img_msg.height, img_msg.width = img_overlay.shape[:2]
+
+    img_msg = ros_numpy.image.numpy_to_image(img_overlay, 'bgr8')
     pub_image_annotated.publish(img_msg)
 
-    now = datetime.datetime.now()
-    cv2.imwrite(str(log_folder / f'{now}.png'), img)
-    cam_t_obj.save(log_folder / f'{now}.{object_name}.txt')
+    utils.log_prediction(object_name=object_name, img=img, cam_t_obj=cam_t_obj)
 
 
 server = actionlib.SimpleActionServer(

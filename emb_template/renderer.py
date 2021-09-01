@@ -11,12 +11,14 @@ opengl_t_opencv = Transform(rotvec=(np.pi, 0, 0))
 
 
 class MeshRenderer:
-    def __init__(self, mesh: trimesh.Trimesh, h: int, w: int, K: np.ndarray = None, yfov=np.deg2rad(45)):
+    def __init__(self, mesh: trimesh.Trimesh, h: int, w: int,
+                 K: np.ndarray = None, yfov=np.deg2rad(45),
+                 color=(1., 1., 1.)):
         self.h, self.w = h, w
         self.center = mesh.bounding_sphere.primitive.center
         self.diameter = mesh.bounding_sphere.primitive.radius * 2
-        self.scene = pyrender.Scene(bg_color=(0, 0, 0, 0), ambient_light=0.1)
-        self.scene.add(pyrender.DirectionalLight(color=(1., 1., 1.), intensity=5), pose=opengl_t_opencv.matrix)
+        self.scene = pyrender.Scene(bg_color=(0, 0, 0, 0), ambient_light=np.array(color) / 5)
+        self.scene.add(pyrender.DirectionalLight(color=color, intensity=5), pose=opengl_t_opencv.matrix)
         self.renderer = pyrender.OffscreenRenderer(viewport_width=w, viewport_height=h)
         znear = self.diameter / 10
         if K is not None:

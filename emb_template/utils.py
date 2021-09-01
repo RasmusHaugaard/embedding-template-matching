@@ -1,4 +1,5 @@
 from pathlib import Path
+import datetime
 
 import cv2
 import numpy as np
@@ -21,8 +22,6 @@ def normalize(img):
 def sorted_paths(paths):
     return natsort.natsorted(paths, key=lambda path: str(path))
 
-
-# TODO: update / remove functions
 
 def latest_checkpoint(object_name):
     models_folder = get_current_template_folder(object_name) / 'models'
@@ -64,8 +63,12 @@ def get_cam_t_table_center(cam_t_table: Transform, K: np.ndarray, w: int, h: int
     return get_cam_t_plane_ray(cam_t_plane=cam_t_table, K=K, x=w // 2, y=h // 2)
 
 
-def get_image_folder():
-    return Path('images')
+def log_prediction(object_name: str, img: np.ndarray, cam_t_obj: Transform):
+    log_folder = Path('log') / object_name
+    log_folder.mkdir(exist_ok=True, parents=True)
+    now = datetime.datetime.now()
+    cv2.imwrite(str(log_folder / f'{now}.png'), img)
+    cam_t_obj.save(log_folder / f'{now}.{object_name}.txt')
 
 
 def get_object_folder(object_name):
@@ -76,8 +79,8 @@ def load_mesh(object_name):
     return trimesh.load_mesh(get_object_folder(object_name) / 'cad.stl')
 
 
-def get_annotation_folder(object_name):
-    return get_object_folder(object_name) / 'annotations'
+def get_annotation_folder(object_name, image_folder):
+    return get_object_folder(object_name) / 'annotations' / image_folder
 
 
 def get_templates_folder(object_name):
@@ -96,22 +99,17 @@ def get_current_template_folder(object_name):
     return get_template_folder(object_name, get_current_template_name(object_name))
 
 
-def load_image_names():
-    return sorted([fp.name[:-4] for fp in Path('images').glob('*.png')])
+def load_image_names(image_folder):
+    return sorted([fp.name[:-4] for fp in Path(image_folder).glob('*.png')])
 
 
-def load_image(image_name):
-    return cv2.imread(f'images/{image_name}.png')
-
-
-def load_annotation_names(object_name):
-    annotation_folder = get_annotation_folder(object_name)
+def load_annotation_names(object_name, image_folder):
+    annotation_folder = get_annotation_folder(object_name, image_folder)
     assert annotation_folder.exists()
     return sorted([fp.name[:-4] for fp in annotation_folder.glob('*.txt')])
 
 
-def load_annotation(image_name, object_name):
-    fp = (get_annotation_folder(object_name) / f'{image_name}.txt')
+def load_annotation(fp):
     with fp.open() as f:
         text = f.read()
     if text.strip() == '':
@@ -120,22 +118,16 @@ def load_annotation(image_name, object_name):
         return Transform.load(fp)
 
 
-def load_valid_annotations(object_name):
-    annotation_names = load_annotation_names(object_name)
-    annotation_names_valid = []
-    annotations_valid = []
-    for annotation_name in annotation_names:
-        annotation = load_annotation(annotation_name, object_name)
-        if annotation is not None:
-            annotations_valid.append(annotation)
-            annotation_names_valid.append(annotation_name)
-    return annotation_names_valid, annotations_valid
-
-
 def load_valid_annotation_and_image_fps(object_name):
-    annotation_names = load_valid_annotations(object_name)[0]
-    annotation_fps = [get_annotation_folder(object_name) / f'{name}.txt' for name in annotation_names]
-    image_fps = [get_image_folder() / f'{name}.png' for name in annotation_names]
+    annotation_folder = get_annotation_folder(object_name, '')
+    annotation_fps = []
+    image_fps = []
+    for fp in annotation_folder.glob('**/*.txt'):
+        annotation = load_annotation(fp)
+        if annotation is not None:
+            annotation_fps.append(fp)
+            relative_dir = fp.parent.relative_to(annotation_folder)
+            image_fps.append(relative_dir / f'{fp.name[:-4]}.png')
     return annotation_fps, image_fps
 
 

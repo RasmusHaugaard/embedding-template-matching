@@ -19,6 +19,8 @@ parser.add_argument('--cad-scale', type=float, default=1e-3)
 args = parser.parse_args()
 object_name = args.object_name
 
+# TODO: validate object name
+
 obj_folder = Path('objects') / object_name
 if obj_folder.exists():
     print('Object with that name already exists')
@@ -35,21 +37,35 @@ cam = camera.Camera(cam_info.image_topic)
 img = cam.take_image()
 
 cam_t_table = Transform.load('cam_t_table.txt')
-cam_t_table_center = utils.get_cam_t_table_center(cam_t_table=cam_t_table, K=cam_info.K, w=cam_info.w, h=cam_info.h)
+cam_t_table_pos = utils.get_cam_t_table_center(cam_t_table=cam_t_table, K=cam_info.K, w=cam_info.w, h=cam_info.h)
 renderer = MeshRenderer(mesh=mesh, h=cam_info.h, w=cam_info.w, K=K)
 
-# TODO: make it easier to evaluate a pose
-#  maybe by moving the object with the mouse, or rendering top / left / front views
-
-print('Choose stable pose. Use "a" and "d" to switch between stable poses. End with enter.')
+print('Choose stable pose. '
+      '  - Use "a" and "d" to switch between stable poses\n'
+      '  - Confirm with Enter\n'
+      '  - Abort with "q"')
 stable_poses, pose_probs = mesh.compute_stable_poses()
 i = 0
-while True:
+
+
+def draw():
     table_t_obj = Transform(matrix=stable_poses[i])
-    cam_t_obj = cam_t_table_center @ table_t_obj
-    overlay, depth = renderer.render(cam_t_obj)
-    comp = vis.composite(img, overlay[..., :3], overlay[..., 3:] // 3 * 2)
+    cam_t_obj = cam_t_table_pos @ table_t_obj
+    overlay = renderer.render(cam_t_obj)[0].copy()
+    overlay[..., :2] = 0
+    comp = vis.composite(img, overlay[..., :3], overlay[..., 3:] // 2)
     cv2.imshow('', comp)
+
+
+def mouse_cb(event, x, y, flags, _):
+    global cam_t_table_pos
+    cam_t_table_pos = utils.get_cam_t_plane_ray(cam_t_plane=cam_t_table, K=cam_info.K, x=x, y=y)
+    draw()
+
+
+cv2.imshow('', img)
+cv2.setMouseCallback('', mouse_cb)
+while True:
     key = cv2.waitKey()
     if key == ord('q'):
         quit()
@@ -59,14 +75,12 @@ while True:
         i = min(i + 1, len(stable_poses) - 1)
     elif key == ord('\r'):
         break
+    draw()
 table_t_obj_stable = Transform(matrix=stable_poses[i])
 
 obj_folder.mkdir(parents=True)
 mesh.export(obj_folder / 'cad.stl')
 table_t_obj_stable.save(obj_folder / 'table_t_obj_stable.txt')
-json.dump(dict(
-    from_cad=True,
-), (obj_folder / 'config.json').open('w'), indent=2)
 
 print()
 print(f'"{object_name}" initialized')
