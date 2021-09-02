@@ -16,6 +16,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('object_name')
 parser.add_argument('cad')
 parser.add_argument('--cad-scale', type=float, default=1e-3)
+parser.add_argument('--image')
 args = parser.parse_args()
 object_name = args.object_name
 
@@ -29,12 +30,15 @@ if obj_folder.exists():
 mesh = trimesh.load_mesh(args.cad)  # type: trimesh.Trimesh
 mesh.apply_scale(args.cad_scale)
 
-rospy.init_node('init_object', anonymous=True)
-
 cam_info = camera.CameraInfo.load()
 K = cam_info.K
-cam = camera.Camera(cam_info.image_topic)
-img = cam.take_image()
+if args.image is not None:
+    assert Path(args.image).is_file()
+    img = cv2.imread(args.image)
+else:
+    rospy.init_node('init_object', anonymous=True)
+    cam = camera.Camera(cam_info.image_topic)
+    img = cam.take_image()
 
 cam_t_table = Transform.load('cam_t_table.txt')
 cam_t_table_pos = utils.get_cam_t_table_center(cam_t_table=cam_t_table, K=cam_info.K, w=cam_info.w, h=cam_info.h)

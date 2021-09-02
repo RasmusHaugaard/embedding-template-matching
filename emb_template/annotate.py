@@ -5,7 +5,6 @@ import cv2
 import numpy as np
 import trimesh
 from transform3d import Transform
-import rospy
 import tqdm
 
 from . import vis
@@ -42,8 +41,6 @@ if not annotations_required:
     quit()
 
 renderer = MeshRenderer(mesh=mesh, h=cam_info.h, w=cam_info.w, K=cam_info.K, color=args.render_color)
-rospy.init_node('annotate', anonymous=True)
-cam = camera.Camera(cam_info.image_topic)
 cam_t_table = Transform.load('cam_t_table.txt')
 table_normal = cam_t_table.R[:, 2]
 table_point = cam_t_table.p
